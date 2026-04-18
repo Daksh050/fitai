@@ -20,6 +20,11 @@ class ActivityEnum(str, Enum):
     moderately_active = "moderately_active"
     very_active = "very_active"
 
+class DietEnum(str, Enum):
+    veg = "veg"
+    non_veg = "non_veg"
+    vegan = "vegan"
+
 # ── Auth ──────────────────────────────────────
 class UserRegister(BaseModel):
     email: EmailStr
@@ -44,6 +49,7 @@ class UserProfileUpdate(BaseModel):
     gender: Optional[GenderEnum] = None
     goal: Optional[GoalEnum] = None
     activity_level: Optional[ActivityEnum] = None
+    dietary_preference: Optional[DietEnum] = None
     full_name: Optional[str] = None
 
 class UserResponse(BaseModel):
@@ -57,6 +63,7 @@ class UserResponse(BaseModel):
     gender: Optional[str]
     goal: Optional[str]
     activity_level: Optional[str]
+    dietary_preference: Optional[str]
     bmr: Optional[float]
     tdee: Optional[float]
     target_calories: Optional[int]

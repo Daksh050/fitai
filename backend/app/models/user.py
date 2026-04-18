@@ -21,6 +21,11 @@ class ActivityEnum(str, enum.Enum):
     moderately_active = "moderately_active"
     very_active = "very_active"
 
+class DietEnum(str, enum.Enum):
+    veg = "veg"
+    non_veg = "non_veg"
+    vegan = "vegan"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -37,6 +42,7 @@ class User(Base):
     gender = Column(Enum(GenderEnum), nullable=True)
     goal = Column(Enum(GoalEnum), nullable=True)
     activity_level = Column(Enum(ActivityEnum), nullable=True)
+    dietary_preference = Column(Enum(DietEnum), nullable=True)
 
     # Computed values (cached)
     bmr = Column(Float, nullable=True)

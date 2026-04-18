@@ -135,6 +135,39 @@ async def test_log_progress(client):
     assert r.json()["weight_kg"] == 72.5
 
 @pytest.mark.asyncio
+async def test_generate_plans_with_local_brain(client):
+    reg = await client.post("/api/auth/register", json={
+        "email": "plans@fitai.com", "username": "planuser", "password": "password123"
+    })
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    profile = await client.put("/api/users/me", headers=headers, json={
+        "age": 25,
+        "weight_kg": 74.0,
+        "height_cm": 178.0,
+        "gender": "male",
+        "goal": "muscle_gain",
+        "activity_level": "moderately_active",
+    })
+    assert profile.status_code == 200
+
+    generated = await client.post("/api/plans/generate", headers=headers, json={
+        "regenerate": False,
+        "workout_days_per_week": 4,
+        "preferred_foods": ["chicken", "rice"],
+    })
+    assert generated.status_code == 202
+
+    diet = await client.get("/api/plans/diet/active", headers=headers)
+    workout = await client.get("/api/plans/workout/active", headers=headers)
+
+    assert diet.status_code == 200
+    assert workout.status_code == 200
+    assert len(diet.json()["meals"]) == 5
+    assert "weekly_schedule" in workout.json()
+
+@pytest.mark.asyncio
 async def test_unauthorized_access(client):
     r = await client.get("/api/users/me")
     assert r.status_code == 403

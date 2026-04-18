@@ -2,16 +2,17 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/authStore'
-import AuthPage from '@/components/pages/AuthPage'
-import OnboardingPage from '@/components/pages/OnboardingPage'
-import DashboardPage from '@/components/pages/DashboardPage'
-import DietPlanPage from '@/components/pages/DietPlanPage'
-import WorkoutPlanPage from '@/components/pages/WorkoutPlanPage'
-import ProgressPage from '@/components/pages/ProgressPage'
-import AppLayout from '@/components/layout/AppLayout'
+import LandingPage from '@/components/pages/LandingPage'
+import CinematicAuthPage from '@/components/pages/CinematicAuthPage'
+import CinematicOnboardingPage from '@/components/pages/CinematicOnboardingPage'
+import CinematicDashboardPage from '@/components/pages/CinematicDashboardPage'
+import CinematicDietPlanPage from '@/components/pages/CinematicDietPlanPage'
+import CinematicWorkoutPlanPage from '@/components/pages/CinematicWorkoutPlanPage'
+import CinematicProgressPage from '@/components/pages/CinematicProgressPage'
+import CinematicAppLayout from '@/components/layout/CinematicAppLayout'
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 5 * 60 * 1000 } },
+  defaultOptions: { queries: { staleTime: 5 * 60 * 1000, retry: 1 } },
 })
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -34,40 +35,51 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              background: '#0c0c26',
+              background: 'rgba(13,13,20,0.95)',
               color: '#fff',
-              border: '1px solid rgba(200,255,0,0.2)',
-              fontFamily: 'DM Sans, sans-serif',
+              border: '1px solid rgba(0,255,136,0.2)',
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 14,
+              borderRadius: 12,
             },
-            success: { iconTheme: { primary: '#c8ff00', secondary: '#0c0c26' } },
+            success: { iconTheme: { primary: '#00ff88', secondary: '#050508' } },
+            error: { iconTheme: { primary: '#ff6b35', secondary: '#050508' } },
           }}
         />
         <Routes>
-          <Route path="/auth" element={<AuthPage />} />
+          {/* Public routes */}
+          <Route path="/landing" element={<LandingPage />} />
+          <Route path="/auth" element={<CinematicAuthPage />} />
+
+          {/* Onboarding (needs auth) */}
           <Route
             path="/onboarding"
             element={
               <ProtectedRoute>
-                <OnboardingPage />
+                <CinematicOnboardingPage />
               </ProtectedRoute>
             }
           />
+
+          {/* App shell (needs auth + onboarding) */}
           <Route
             path="/"
             element={
               <ProtectedRoute>
                 <OnboardingGuard>
-                  <AppLayout />
+                  <CinematicAppLayout />
                 </OnboardingGuard>
               </ProtectedRoute>
             }
           >
-            <Route index element={<DashboardPage />} />
-            <Route path="diet" element={<DietPlanPage />} />
-            <Route path="workout" element={<WorkoutPlanPage />} />
-            <Route path="progress" element={<ProgressPage />} />
+            <Route index element={<CinematicDashboardPage />} />
+            <Route path="diet" element={<CinematicDietPlanPage />} />
+            <Route path="workout" element={<CinematicWorkoutPlanPage />} />
+            <Route path="progress" element={<CinematicProgressPage />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
+
+          {/* Root redirect: unauthenticated → landing, authenticated → dashboard */}
+          <Route path="*" element={<Navigate to="/landing" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

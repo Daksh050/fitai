@@ -1,10 +1,10 @@
-import anthropic
 import json
 import httpx
+import uuid
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
-
-client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+from app.services.local_brain import build_local_diet_plan, build_local_workout_plan
+from app.services.fitai_brain import generate_structured_plan
 
 ACTIVITY_MULTIPLIERS = {
     "sedentary": 1.2,
@@ -92,10 +92,15 @@ async def generate_diet_plan(
     targets: Dict[str, float],
     preferences: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Use Claude to generate a personalized 5-meal diet plan"""
+    """Generate a personalized 5-meal diet plan."""
 
     dietary_restrictions = preferences.get("dietary_restrictions", []) if preferences else []
     preferred_foods = preferences.get("preferred_foods", []) if preferences else []
+
+    if user_data.get("dietary_preference"):
+        dietary_restrictions.append(f"STRICTLY {user_data.get('dietary_preference').replace('_', ' ').upper()} DIET ONLY")
+
+    random_seed = uuid.uuid4().hex
 
     # Try to get some real food data for grounding
     real_foods_data = await fetch_real_foods_from_usda("high protein muscle building foods")
@@ -104,6 +109,8 @@ async def generate_diet_plan(
         food_context = f"\nReal food data from USDA for reference:\n{json.dumps(real_foods_data[:3], indent=2)}"
 
     prompt = f"""You are an expert sports nutritionist and dietitian. Create a detailed, personalized daily diet plan.
+
+IMPORTANT: Ensure this generation is completely novel and unique compared to standard boilerplate plans. Here is a high-entropy seed to guarantee variation: {random_seed}
 
 USER PROFILE:
 - Age: {user_data.get('age')} years
@@ -158,31 +165,25 @@ Respond ONLY with a valid JSON object with this structure:
   ]
 }}"""
 
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}]
+    return await generate_structured_plan(
+        prompt,
+        lambda: build_local_diet_plan(user_data, targets, preferences),
     )
-
-    response_text = message.content[0].text
-    # Strip markdown code blocks if present
-    if "```json" in response_text:
-        response_text = response_text.split("```json")[1].split("```")[0].strip()
-    elif "```" in response_text:
-        response_text = response_text.split("```")[1].split("```")[0].strip()
-
-    return json.loads(response_text)
 
 async def generate_workout_plan(
     user_data: Dict[str, Any],
     preferences: Optional[Dict] = None,
 ) -> Dict[str, Any]:
-    """Use Claude to generate a personalized weekly workout plan"""
+    """Generate a personalized weekly workout plan."""
 
     workout_days = preferences.get("workout_days_per_week", 4) if preferences else 4
     equipment = preferences.get("available_equipment", []) if preferences else []
 
+    random_seed = uuid.uuid4().hex
+
     prompt = f"""You are an expert certified personal trainer. Create a detailed, personalized weekly workout plan.
+
+IMPORTANT: Ensure this program contains a unique, creative, and completely novel sequence of exercises. DO NOT repeat standard boilerplate routines. Use this high-entropy seed to guarantee massive variation while retaining effectiveness: {random_seed}
 
 USER PROFILE:
 - Age: {user_data.get('age')} years
@@ -195,8 +196,8 @@ USER PROFILE:
 - Available equipment: {', '.join(equipment) if equipment else 'Basic gym equipment'}
 
 Create a {workout_days}-day per week workout program that:
-1. Focuses on muscle gain (progressive overload principle)
-2. Is appropriate for someone with sedentary lifestyle transitioning to gym
+1. Matches the primary goal
+2. Is appropriate for someone with sedentary lifestyle transitioning into training
 3. Includes warm-up and cool-down
 4. Has realistic sets/reps for a beginner-intermediate
 
@@ -226,24 +227,14 @@ Respond ONLY with a valid JSON object:
       "cool_down": "5 min stretching"
     }},
     "tuesday": {{"rest": true, "session_name": "Rest / Active Recovery", "activities": ["light walk", "stretching"]}},
-    "wednesday": {{...same structure as monday...}},
-    "thursday": {{"rest": true, ...}},
-    "friday": {{...}},
-    "saturday": {{...}},
-    "sunday": {{"rest": true, ...}}
+    "wednesday": {{"session_name": "Pull Day", "duration_minutes": 60, "exercises": []}},
+    "thursday": {{"rest": true, "session_name": "Rest / Active Recovery", "activities": ["mobility"]}},
+    "friday": {{"session_name": "Leg Day", "duration_minutes": 65, "exercises": []}},
+    "saturday": {{"session_name": "Conditioning", "duration_minutes": 40, "exercises": []}},
+    "sunday": {{"rest": true, "session_name": "Rest / Active Recovery", "activities": ["walk"]}}
   }}
 }}"""
-
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=5000,
-        messages=[{"role": "user", "content": prompt}]
+    return await generate_structured_plan(
+        prompt,
+        lambda: build_local_workout_plan(user_data, preferences),
     )
-
-    response_text = message.content[0].text
-    if "```json" in response_text:
-        response_text = response_text.split("```json")[1].split("```")[0].strip()
-    elif "```" in response_text:
-        response_text = response_text.split("```")[1].split("```")[0].strip()
-
-    return json.loads(response_text)

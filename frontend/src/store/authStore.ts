@@ -13,6 +13,7 @@ interface User {
   gender?: string
   goal?: string
   activity_level?: string
+  dietary_preference?: string
   bmr?: number
   tdee?: number
   target_calories?: number
