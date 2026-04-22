@@ -61,3 +61,4 @@ class User(Base):
     diet_plans = relationship("DietPlan", back_populates="user", cascade="all, delete-orphan")
     workout_plans = relationship("WorkoutPlan", back_populates="user", cascade="all, delete-orphan")
     progress_logs = relationship("ProgressLog", back_populates="user", cascade="all, delete-orphan")
+    plan_recommendations = relationship("PlanRecommendation", back_populates="user", cascade="all, delete-orphan")

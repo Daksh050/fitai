@@ -84,6 +84,14 @@ class GeneratePlanRequest(BaseModel):
     available_equipment: Optional[List[str]] = []
     workout_days_per_week: Optional[int] = Field(4, ge=2, le=7)
 
+class GeneratePlanResponse(BaseModel):
+    message: str
+    diet_plan_id: int
+    workout_plan_id: int
+    recommendation_id: int
+    model_name: str
+    model_version: str
+
 class MealItem(BaseModel):
     name: str
     quantity: str
@@ -125,6 +133,18 @@ class WorkoutPlanResponse(BaseModel):
     focus_muscles: Optional[List[str]]
     equipment_needed: Optional[List[str]]
     notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PlanRecommendationResponse(BaseModel):
+    id: int
+    model_name: str
+    model_version: str
+    feature_snapshot: Dict[str, Any]
+    diet_prediction: Dict[str, Any]
+    workout_prediction: Dict[str, Any]
     created_at: datetime
 
     class Config:

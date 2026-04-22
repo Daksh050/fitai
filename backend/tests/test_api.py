@@ -167,6 +167,13 @@ async def test_generate_plans_with_local_brain(client):
     assert len(diet.json()["meals"]) == 5
     assert "weekly_schedule" in workout.json()
 
+    recommendation = await client.get("/api/plans/recommendations/latest", headers=headers)
+    assert recommendation.status_code == 200
+    recommendation_data = recommendation.json()
+    assert recommendation_data["model_version"] == "fitai-rf-v1"
+    assert "diet_prediction" in recommendation_data
+    assert "workout_prediction" in recommendation_data
+
 @pytest.mark.asyncio
 async def test_unauthorized_access(client):
     r = await client.get("/api/users/me")

@@ -1,24 +1,30 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.plan import DietPlan, WorkoutPlan
-from app.schemas.schemas import GeneratePlanRequest, DietPlanResponse, WorkoutPlanResponse
+from app.models.recommendation import PlanRecommendation
+from app.schemas.schemas import (
+    GeneratePlanRequest,
+    GeneratePlanResponse,
+    DietPlanResponse,
+    WorkoutPlanResponse,
+    PlanRecommendationResponse,
+)
 from app.services.ai_service import (
     generate_diet_plan,
     generate_workout_plan,
-    calculate_targets,
 )
+from app.services.recommendation_engine import build_plan_recommendation
 from typing import List
 
 router = APIRouter()
 
-@router.post("/generate", status_code=202)
+@router.post("/generate", response_model=GeneratePlanResponse, status_code=202)
 async def generate_plans(
     payload: GeneratePlanRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -35,14 +41,13 @@ async def generate_plans(
         "activity_level": current_user.activity_level.value if hasattr(current_user.activity_level, 'value') else current_user.activity_level,
     }
 
-    targets = {
-        "target_calories": current_user.target_calories or 2500,
-        "protein_g": current_user.target_protein_g or 150,
-        "carbs_g": current_user.target_carbs_g or 250,
-        "fat_g": current_user.target_fat_g or 70,
-    }
-
     prefs = payload.model_dump()
+    recommendation = await build_plan_recommendation(db, current_user, prefs)
+    targets = recommendation.diet_prediction["targets"]
+    prefs["model_hints"] = {
+        **recommendation.diet_prediction,
+        **recommendation.workout_prediction,
+    }
 
     # Generate plans (in production you'd use Celery/background tasks)
     try:
@@ -91,11 +96,14 @@ async def generate_plans(
     db.add(workout_plan)
     await db.flush()
 
-    return {
-        "message": "Plans generated successfully",
-        "diet_plan_id": diet_plan.id,
-        "workout_plan_id": workout_plan.id,
-    }
+    return GeneratePlanResponse(
+        message="Plans generated successfully",
+        diet_plan_id=diet_plan.id,
+        workout_plan_id=workout_plan.id,
+        recommendation_id=recommendation.id,
+        model_name=recommendation.model_name,
+        model_version=recommendation.model_version,
+    )
 
 @router.get("/diet", response_model=List[DietPlanResponse])
 async def get_diet_plans(
@@ -140,3 +148,18 @@ async def get_active_workout(
     if not plan:
         raise HTTPException(status_code=404, detail="No active workout plan found")
     return plan
+
+@router.get("/recommendations/latest", response_model=PlanRecommendationResponse)
+async def get_latest_recommendation(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(PlanRecommendation)
+        .where(PlanRecommendation.user_id == current_user.id)
+        .order_by(PlanRecommendation.created_at.desc(), PlanRecommendation.id.desc())
+    )
+    recommendation = result.scalars().first()
+    if not recommendation:
+        raise HTTPException(status_code=404, detail="No recommendation snapshot found")
+    return recommendation
